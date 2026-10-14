@@ -1,0 +1,19 @@
+[repository]
+name = "glowbuffer"
+authors = ["Vergil"]
+# [hyprland commit, glowbuffer commit] — hyprpm builds the glowbuffer commit pinned to the
+# running Hyprland's commit, or HEAD when none matches. Add a pair per Hyprland release once
+# a glowbuffer commit builds against it:
+#   Hyprland v0.56.2 = efb50993780079460b0cbed1363e2166a2de1d9f
+commit_pins = [
+    # ["efb50993780079460b0cbed1363e2166a2de1d9f", "<glowbuffer commit>"],
+]
+
+[glowbuffer]
+description = "Drag and drop and paste that work on Hyprland, sandboxed apps included"
+authors = ["Vergil"]
+output = "build/glowbuffer.so"
+build = [
+    "cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=g++",
+    "cmake --build build -j",
+]
