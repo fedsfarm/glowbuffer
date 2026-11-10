@@ -39,7 +39,7 @@ static int g_checks   = 0;
 
 static void testActions() {
     // Thunar's drag: copy|move|ask. The bug report case: a GTK4 target that takes copy only.
-    // Hyprland 0.56 forces MOVE here; the protocol answer is COPY.
+    // Hyprland 0.56 and 0.57 force MOVE here; the protocol answer is COPY.
     CHECK_EQ(chooseAction({.sourceActions = ACTION_ALL, .targetActions = ACTION_COPY, .targetPreferred = ACTION_COPY}), ACTION_COPY);
 
     // nothing announced before the target speaks

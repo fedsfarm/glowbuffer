@@ -166,7 +166,7 @@ namespace Glowbuffer::Persist {
 
         s->kept = makeShared<CKeptSource>(std::move(data));
         ++s->stats.restored;
-        Log::logger->log(Log::DEBUG, "[glowbuffer] clipboard kept after its app closed ({} formats)", s->kept->mimes().size());
+        Log::logger->log(Log::DEBUG, "glowbuffer", "clipboard kept after its app closed ({} formats)", s->kept->mimes().size());
         return s->kept;
     }
 

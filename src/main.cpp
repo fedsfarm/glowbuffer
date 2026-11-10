@@ -2,9 +2,9 @@
 //
 // One function hook, on CWLDataOfferResource::sendData(). Hyprland calls it right after it
 // creates a wl_data_offer, for drags (CWLDataDeviceProtocol::updateDrag) and for the clipboard
-// (sendSelectionToDevice) alike, and both call sites call it out of line in the 0.56.2 binary,
-// so the hook sees every offer. The replacement does what the original did, minus the early
-// hardcoded MOVE action, and installs two request handlers on the offer:
+// (sendSelectionToDevice) alike, and both call sites call it out of line in the 0.56.2 and
+// 0.57.1 binaries, so the hook sees every offer. The replacement does what the original did,
+// minus the early hardcoded MOVE action, and installs two request handlers on the offer:
 //
 //   set_actions  the action negotiation Hyprland never implemented (see Actions.hpp)
 //   receive      the file bridge for sandboxed targets (see Bridge.hpp), images pasted into
@@ -33,8 +33,9 @@
 #include <hyprland/src/config/values/types/BoolValue.hpp>
 #include <hyprland/src/config/values/types/StringValue.hpp>
 #include <hyprland/src/desktop/state/WindowState.hpp>
-#include <hyprland/src/desktop/view/Window.hpp>
+#include <hyprland/src/desktop/view/window/Window.hpp>
 #include <hyprland/src/debug/log/Logger.hpp>
+#include <hyprland/src/ipc/s1/S1.hpp>
 #include <hyprland/src/SharedDefs.hpp>
 
 #include <wayland-server-core.h>
@@ -68,7 +69,8 @@
 using namespace Glowbuffer;
 using Hyprutils::OS::CFileDescriptor;
 
-static_assert(MOD_SHIFT == HL_MODIFIER_SHIFT && MOD_CTRL == HL_MODIFIER_CTRL, "Hyprland renumbered its modifier bits; update Actions.hpp");
+static_assert(MOD_SHIFT == static_cast<uint32_t>(Input::HL_MODIFIER_SHIFT) && MOD_CTRL == static_cast<uint32_t>(Input::HL_MODIFIER_CTRL),
+              "Hyprland renumbered its modifier bits; update Actions.hpp");
 static_assert(ACTION_COPY == WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY && ACTION_MOVE == WL_DATA_DEVICE_MANAGER_DND_ACTION_MOVE &&
               ACTION_ASK == WL_DATA_DEVICE_MANAGER_DND_ACTION_ASK);
 
@@ -145,7 +147,7 @@ namespace {
         CHyprSignalListener   keyListener;
         // the drop: Hyprland ends a drag on any pointer button release, touch up or tablet tip up
         CHyprSignalListener buttonListener, touchListener, tipListener;
-        SP<SHyprCtlCommand>   ctl;
+        SP<IPC::Socket1::SCommand> ctl;
 
         // The offer under the pointer in the drag in progress, and what its source was last told.
         std::weak_ptr<SOfferState> current;
@@ -177,7 +179,7 @@ namespace {
     // Shift and Control as they are right now. getModsFromAllKBs() is the state BEFORE the key
     // being processed, so a key event passes the key it carries to fold in.
     uint32_t heldModifiers(const IKeyboard::SKeyEvent* pending = nullptr) {
-        uint32_t mods = g_pInputManager ? g_pInputManager->getModsFromAllKBs() : 0;
+        uint32_t mods = g_pInputManager ? static_cast<uint32_t>(g_pInputManager->getModsFromAllKBs()) : 0;
         if (!pending)
             return mods;
         uint32_t bit = 0;
@@ -274,7 +276,7 @@ namespace {
         // source hears so) and COPY for an older one, which cannot negotiate at all.
         negotiate(st, heldModifiers());
 
-        Log::logger->log(Log::DEBUG, "[glowbuffer] drag offer {:x}: {} mimes, source actions {}, target v{}", (uintptr_t)self, MIMES.size(), ACTIONS, st->version);
+        Log::logger->log(Log::DEBUG, "glowbuffer", "drag offer {:x}: {} mimes, source actions {}, target v{}", (uintptr_t)self, MIMES.size(), ACTIONS, st->version);
     }
 }
 
@@ -291,11 +293,11 @@ namespace {
     // whose selection never reaches a wl_data_offer).
     std::string windowClass(wl_client* client) {
         for (const auto& w : Desktop::windowState()->windows()) {
-            if (!w || w->m_isX11)
+            if (!w || w->backend().isX11())
                 continue;
             const auto SURFACE = w->resource();
             if (SURFACE && SURFACE->client() == client)
-                return w->m_initialClass.empty() ? w->m_class : w->m_initialClass;
+                return w->metadata().initialAppID().empty() ? w->metadata().appID() : w->metadata().initialAppID();
         }
         return {};
     }
@@ -465,7 +467,7 @@ namespace {
             }
 
             const std::string MIME = mime ? mime : "";
-            Log::logger->log(Log::DEBUG, "[glowbuffer] offer {:x} asks for {}", (uintptr_t)self, MIME);
+            Log::logger->log(Log::DEBUG, "glowbuffer", "offer {:x} asks for {}", (uintptr_t)self, MIME);
 
             // a format glowbuffer added: the source has only `sourceMime`, so that is what is
             // accepted and read
@@ -544,7 +546,7 @@ namespace {
                 res->sendOffer(m.c_str());
             if (SOURCE->hasDnd())
                 installAccept(self, res, *INJECT);
-            Log::logger->log(Log::DEBUG, "[glowbuffer] offer {:x}: {} also offered as a file list", (uintptr_t)self, INJECT->sourceMime);
+            Log::logger->log(Log::DEBUG, "glowbuffer", "offer {:x}: {} also offered as a file list", (uintptr_t)self, INJECT->sourceMime);
         }
 
         if (enabled(g->fileBridge) || INJECT)
@@ -598,13 +600,13 @@ namespace {
         return out;
     }
 
-    std::string status(eHyprCtlOutputFormat format, std::string) {
+    IPC::Socket1::SResponse status(const IPC::Socket1::SRequest& req) {
         const auto S      = Bridge::stats();
         const auto P      = Persist::stats();
         const bool HOOKED = g_armed.load() && g->hook && g->selectionHook;
         const auto ON     = [](const SP<Config::Values::CBoolValue>& v) { return enabled(v); };
 
-        if (format == FORMAT_JSON)
+        if (req.format == IPC::Socket1::FORMAT_JSON)
             return std::format(R"({{"version":"{}","hooked":{},"negotiate_actions":{},"modifiers":{},"file_bridge":{},"paste_images":{},"persist_clipboard":{},)"
                                R"("offers_negotiated":{},"actions_sent":{},"transfers":{},"files_exported":{},"passthrough":{},"portal_lists":{},"images_pasted":{},)"
                                R"("clipboards_read":{},"clipboards_kept":{},"password_clipboards_skipped":{},"failures":{},"last_error":"{}"}})",
@@ -674,7 +676,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
                                                 SP<Config::Values::IValue>(g->pasteImageApps), SP<Config::Values::IValue>(g->persist),
                                                 SP<Config::Values::IValue>(g->fileBridgeSources)}) {
         if (!HyprlandAPI::addConfigValueV2(handle, v))
-            Log::logger->log(Log::ERR, "[glowbuffer] could not register config value {}", v->name());
+            Log::logger->log(Log::ERR, "glowbuffer", "could not register config value {}", v->name());
     }
 
     for (const auto& FN : HyprlandAPI::findFunctionsByName(handle, "sendData")) {
@@ -712,7 +714,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
             onDragEnd();
     });
 
-    g->ctl = HyprlandAPI::registerHyprCtlCommand(handle, SHyprCtlCommand{.name = "glowbuffer", .exact = true, .fn = status});
+    g->ctl = HyprlandAPI::registerHyprCtlCommand(handle, IPC::Socket1::SCommand{.name = "glowbuffer", .match = IPC::Socket1::COMMAND_MATCH_EXACT, .handler = status});
 
     Bridge::start();
     Persist::start([] { return enabled(g->persist); });

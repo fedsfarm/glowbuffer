@@ -4,7 +4,7 @@
 // Mutter implement it. Pure logic: no Hyprland, no wayland headers, so tests/unit.cpp can
 // exercise every rule without a compositor.
 //
-// What Hyprland 0.56 does instead (src/protocols/core/DataDevice.cpp,
+// What Hyprland 0.56 and 0.57 do instead (src/protocols/core/DataDevice.cpp,
 // CWLDataOfferResource::sendData): it sends wl_data_offer.action(MOVE) the moment an offer is
 // created, before wl_data_device.enter, whenever the source allows MOVE, and it never handles
 // wl_data_offer.set_actions. GTK4 reads that early MOVE as the only action on the table, so a
@@ -25,8 +25,9 @@ namespace Glowbuffer {
     inline constexpr uint32_t ACTION_ASK  = 4;
     inline constexpr uint32_t ACTION_ALL  = ACTION_COPY | ACTION_MOVE | ACTION_ASK;
 
-    // Hyprland's eKeyboardModifiers bits (devices/IKeyboard.hpp), which getModsFromAllKBs()
-    // returns. Restated for the same reason as above; main.cpp static_asserts they still match.
+    // Hyprland's Input::eKeyboardModifiers bits (input/Keys.hpp), which getModsFromAllKBs()
+    // returns as an Input::ModifierMask. Restated for the same reason as above; main.cpp
+    // static_asserts they still match.
     inline constexpr uint32_t MOD_SHIFT = 1u << 0;
     inline constexpr uint32_t MOD_CTRL  = 1u << 2;
 

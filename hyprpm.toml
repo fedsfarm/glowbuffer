@@ -2,11 +2,13 @@
 name = "glowbuffer"
 authors = ["Vergil"]
 # [hyprland commit, glowbuffer commit] — hyprpm builds the glowbuffer commit pinned to the
-# running Hyprland's commit, or HEAD when none matches. Add a pair per Hyprland release once
-# a glowbuffer commit builds against it:
-#   Hyprland v0.56.2 = efb50993780079460b0cbed1363e2166a2de1d9f
+# running Hyprland's commit, or HEAD when none matches. HEAD targets Hyprland 0.57; 0.56.x
+# builds the last pre-0.57 glowbuffer. A port to a new Hyprland series adds pins for the
+# previous one.
 commit_pins = [
-    # ["efb50993780079460b0cbed1363e2166a2de1d9f", "<glowbuffer commit>"],
+    ["36b2e0cfe0c6094dbc47bd42a437431315bb3087", "73ad72b679f61d3af939743944c333913a453eb9"], # v0.56.0
+    ["5c9377c15f85c50648f35ca5a213754f95b93ca0", "73ad72b679f61d3af939743944c333913a453eb9"], # v0.56.1
+    ["efb50993780079460b0cbed1363e2166a2de1d9f", "73ad72b679f61d3af939743944c333913a453eb9"], # v0.56.2
 ]
 
 [glowbuffer]

@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-glowbuffer is a Hyprland 0.56 plugin: drag-and-drop action negotiation (Hyprland forces
+glowbuffer is a Hyprland 0.57 plugin: drag-and-drop action negotiation (Hyprland forces
 MOVE and ignores `wl_data_offer.set_actions`) plus a file bridge that exports dragged and
 pasted files to Flatpak apps through the document portal. README.md is brief on purpose
 (the fedsfarm plugin style, like gloview); the details live here.
